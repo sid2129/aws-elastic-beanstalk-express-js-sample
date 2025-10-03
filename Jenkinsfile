@@ -1,7 +1,5 @@
 pipeline {
-    agent {
-        docker { image 'node:16-alpine' }
-    }
+    agent any
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub-credentials')
         SNYK_TOKEN = credentials('snyk-token') // only if using Snyk
@@ -15,7 +13,7 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
-                sh 'npm test || true' // keep going even if tests fail for demo
+                sh 'npm test || true'
             }
         }
 
@@ -40,3 +38,4 @@ pipeline {
         }
     }
 }
+
