@@ -1,33 +1,67 @@
 pipeline {
-    agent any
-    environment {
-        DOCKER_HUB_CREDS = credentials('dockerhub-credentials')
-        SNYK_TOKEN = credentials('snyk-token')
+    agent {
+        docker { image 'node:16-alpine' }
     }
+
+    environment {
+        IMAGE_NAME = "aws-node-sample-app"
+        REGISTRY = "your-dockerhub-username" // replace with your Docker Hub username
+    }
+
     stages {
-        stage('Install Dependencies & Run Tests') {
+        stage('Install Dependencies') {
             steps {
-                sh 'docker run --rm -v $PWD:/app -w /app node:16-alpine sh -c "npm install --save && npm test || true"'
+                sh 'npm install --save'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Run Unit Tests') {
             steps {
-                sh """
-                echo $DOCKER_HUB_CREDS_PSW | docker login -u $DOCKER_HUB_CREDS_USR --password-stdin
-                docker build -t ${DOCKER_HUB_CREDS_USR}/aws-nodejs-sample:latest .
-                docker push ${DOCKER_HUB_CREDS_USR}/aws-nodejs-sample:latest
-                """
+                sh 'npm test || echo "Tests completed"'
             }
         }
 
         stage('Security Scan') {
             steps {
-                sh """
-                docker run --rm -v $PWD:/app -w /app node:16-alpine sh -c "npm install -g snyk && snyk auth $SNYK_TOKEN && snyk test --severity-threshold=high"
-                """
+                // Using npm audit as a basic example
+                sh '''
+                npm install -g snyk
+                snyk test || exit 1
+                '''
             }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:latest ."
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    docker tag ${IMAGE_NAME}:latest $DOCKER_USER/${IMAGE_NAME}:latest
+                    docker push $DOCKER_USER/${IMAGE_NAME}:latest
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning up...'
+            sh 'docker system prune -f'
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed.'
         }
     }
 }
 
+N
