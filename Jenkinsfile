@@ -2,17 +2,18 @@ pipeline {
     agent any
     environment {
         DOCKER_HUB_CREDS = credentials('dockerhub-credentials')
-        SNYK_TOKEN = credentials('snyk-token') // only if using Snyk
+        SNYK_TOKEN = credentials('snyk-token')
     }
     stages {
-        stage('Install Dependencies') {
+        stage('Install Dependencies & Run Tests') {
+            agent {
+                docker {
+                    image 'node:16-alpine'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
             steps {
                 sh 'npm install --save'
-            }
-        }
-
-        stage('Run Unit Tests') {
-            steps {
                 sh 'npm test || true'
             }
         }
@@ -28,6 +29,11 @@ pipeline {
         }
 
         stage('Security Scan') {
+            agent {
+                docker {
+                    image 'node:16-alpine'
+                }
+            }
             steps {
                 sh """
                 npm install -g snyk
