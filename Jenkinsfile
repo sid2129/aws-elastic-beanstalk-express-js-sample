@@ -6,15 +6,8 @@ pipeline {
     }
     stages {
         stage('Install Dependencies & Run Tests') {
-            agent {
-                docker {
-                    image 'node:16-alpine'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                }
-            }
             steps {
-                sh 'npm install --save'
-                sh 'npm test || true'
+                sh 'docker run --rm -v $PWD:/app -w /app node:16-alpine sh -c "npm install --save && npm test || true"'
             }
         }
 
@@ -29,16 +22,9 @@ pipeline {
         }
 
         stage('Security Scan') {
-            agent {
-                docker {
-                    image 'node:16-alpine'
-                }
-            }
             steps {
                 sh """
-                npm install -g snyk
-                snyk auth $SNYK_TOKEN
-                snyk test --severity-threshold=high
+                docker run --rm -v $PWD:/app -w /app node:16-alpine sh -c "npm install -g snyk && snyk auth $SNYK_TOKEN && snyk test --severity-threshold=high"
                 """
             }
         }
